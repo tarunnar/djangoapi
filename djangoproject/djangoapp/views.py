@@ -25,31 +25,40 @@ class Employeeparticular(View):
             response = serialize('json', [emp,])
             return HttpResponse(response, content_type='application/json', status=200)
     def put(self, request,empid, *args, **kwargs):
-        try:
-            emp = Employee.objects.get(empid=empid)
-        except Employee.DoesNotExist:
+        emp = Employee.objects.get(empid=empid)
+        if emp is None:
             response = {"resp": "resource  to be updated doesnotexist"}
             return JsonResponse(response, status=500)
+        isjson = isValidJson(request.body)
+        if not isjson:
+            err_message = {"msg": "give json data only"}
+            return HttpResponse(json.dumps(err_message), content_type='application/json', status=400)
+        valid_data = json.loads(request.body)
+        json_data = serialize("json", [emp, ])
+        json_data = json.loads(json_data)
+        original = {
+            "empid": json_data[0]["pk"],
+            "empname": json_data[0]["fields"]["empname"],
+            "empage": int(json_data[0]["fields"]["empage"]),
+            "empexp": int(json_data[0]["fields"]["empexp"])
+        }
+        original.update(valid_data)
+        form =EmployeeForm(original, instance=emp)
+        form.save(commit=True)
+        response = {"msg": "resource updated successfully"}
+        return HttpResponse(json.dumps(response), content_type='application/json', status=200)
+    def delete(self, request, empid, *args, **kwargs):
+        emp = Employee.objects.get(empid=empid)
+        if emp is None:
+            response = {"msg" : "requested resource to be deleted not exists"}
+            return HttpResponse(json.dumps(response), content_type="application/json", status=500)
+        status, deleted_item = emp.delete()
+        if status == 1:
+            success = {"msg": "deleted the record"}
+            return HttpResponse(json.dumps(success), content_type="application/json", status=200)
         else:
-            isjson = isValidJson(request.body)
-            if not isjson:
-                err_message = {"msg": "give json data only"}
-                return HttpResponse(json.dumps(err_message), content_type='application/json', status=400)
-            valid_data = json.loads(request.body)
-            json_data = serialize("json", [emp, ])
-            json_data = json.loads(json_data)
-            original = {
-                "empid": json_data[0]["pk"],
-                "empname": json_data[0]["fields"]["empname"],
-                "empage": int(json_data[0]["fields"]["empage"]),
-                "empexp": int(json_data[0]["fields"]["empexp"])
-            }
-            original.update(valid_data)
-            form =EmployeeForm(original, instance=emp)
-            form.save(commit=True)
-            response = {"msg": "resource updated successfully"}
-            return HttpResponse(json.dumps(response), content_type='application/json', status=200)
-
+            failure = {"msg": "please try again to delete"}
+            return HttpResponse(json.dumps(failure), content_type="application/json", status=500)
 class EmployeeList(View):
 
     def get(self, request, *args, **kwargs):
